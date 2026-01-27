@@ -1,13 +1,34 @@
 import { Socket, Server as SocketIOServer } from 'socket.io'
 import type { RTCSessionDescriptionInit } from '../../types/webrtc'
+import { sessionManager } from '../auth/SessionManager'
+
+interface AuthenticatedSocket extends Socket {
+  sessionId?: string
+  userId?: string
+}
 
 export class SignalingService {
-  private connectedClients = new Map<string, Socket>()
+  private connectedClients = new Map<string, AuthenticatedSocket>()
 
   constructor(private io: SocketIOServer) {}
 
-  handleConnection(socket: Socket): void {
-    console.log('Client connected:', socket.id)
+  handleConnection(socket: AuthenticatedSocket): void {
+    // 验证 sessionId
+    const sessionId = socket.handshake.auth.sessionId as string
+
+    if (!sessionId || !sessionManager.validate(sessionId)) {
+      socket.emit('error', { message: 'Unauthorized: Invalid or expired session' })
+      socket.disconnect()
+      console.warn('Unauthorized connection attempt:', socket.id)
+      return
+    }
+
+    // 获取会话数据
+    const sessionData = sessionManager.get(sessionId)
+
+    console.log('Client connected:', socket.id, 'session:', sessionId)
+    socket.sessionId = sessionId
+    socket.userId = sessionData?.userId
     this.connectedClients.set(socket.id, socket)
 
     socket.on('offer', async (data) => {

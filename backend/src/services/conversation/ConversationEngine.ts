@@ -6,6 +6,7 @@ import { StateManager, ConversationStage } from './StateManager'
 export class ConversationEngine {
   private conversationHistory: ConversationMessage[] = []
   private currentProject: string = ''
+  private readonly MAX_HISTORY = 100 // 最大保留 100 条消息
 
   constructor(
     private asr: MockASRService,
@@ -60,7 +61,7 @@ export class ConversationEngine {
 
     // 检查是否需要切换项目
     const projectMatch = userMessage.match(/项目\s*[:：]?\s*([^\s，。]+)/)
-    if (projectMatch) {
+    if (projectMatch?.[1]) {
       this.switchProject(projectMatch[1])
     }
 

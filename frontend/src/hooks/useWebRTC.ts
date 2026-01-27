@@ -57,7 +57,10 @@ export function useWebRTC() {
 
       // 2. 连接 Socket.IO
       const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
-        transports: ['websocket', 'polling']
+        transports: ['websocket', 'polling'],
+        auth: {
+          sessionId: session.sessionId
+        }
       })
       socketRef.current = socket
 

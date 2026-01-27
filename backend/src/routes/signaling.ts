@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { sessionManager } from '../services/auth/SessionManager'
 
 const router = Router()
 
@@ -7,8 +8,8 @@ router.post('/api/call/start', async (req: Request, res: Response) => {
   try {
     const { projectName } = req.body
 
-    // TODO: 创建会话并返回 session ID
-    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // 使用 SessionManager 创建会话
+    const sessionId = sessionManager.create()
 
     res.json({
       success: true,
@@ -30,7 +31,10 @@ router.post('/api/call/end', async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.body
 
-    // TODO: 清理会话资源
+    // 撤销会话
+    if (sessionId) {
+      sessionManager.revoke(sessionId)
+    }
 
     res.json({
       success: true,

@@ -1,4 +1,5 @@
 import type { ConversationMessage } from '../../services/doubao/MockLLMService'
+import { userMessageSchema, projectNameSchema } from '../../utils/validation'
 
 type ConversationStage = 'greeting' | 'today' | 'tomorrow' | 'summary' | 'complete'
 
@@ -20,7 +21,7 @@ export class QuestionGenerator {
       return '您好，我是日报助手。今天想从哪个项目开始？'
     }
 
-    const lastMessage = history[history.length - 1]?.content || ''
+    const lastMessage = history[history.length - 1]?.content ?? ''
 
     if (project) {
       return `好的，我们来记录 ${project} 的工作。请告诉我今天具体完成了哪些工作？`
@@ -58,15 +59,24 @@ export class QuestionGenerator {
   }
 
   shouldSwitchStage(currentStage: ConversationStage, userMessage: string): boolean {
+    // 验证输入
+    const validation = userMessageSchema.safeParse({ role: 'user', content: userMessage })
+    if (!validation.success) {
+      console.error('Invalid user message:', validation.error)
+      return false
+    }
+
+    // 使用更严格的正则
     switch (currentStage) {
       case 'greeting':
-        return /项目|[\u4e00-\u9fa5]+/.test(userMessage)
+        // 匹配"项目：xxx"或"项目xxx"格式，1-50个字符
+        return /^项目\s*[:：]?\s*[\u4e00-\u9fa5a-zA-Z0-9_\s-]{1,50}$/.test(userMessage.trim())
       case 'today':
-        return /完成|开发|实现|修复|优化|部署|测试/.test(userMessage)
+        return /(完成|开发|实现|修复|优化|部署|测试|编写|创建|添加)/.test(userMessage)
       case 'tomorrow':
-        return /明天|计划|打算/.test(userMessage)
+        return /(明天|计划|打算|后续|下一步|将要|准备)/.test(userMessage)
       case 'summary':
-        return /总结|好的|可以/.test(userMessage)
+        return /(总结|好的|可以)/.test(userMessage)
       default:
         return false
     }
