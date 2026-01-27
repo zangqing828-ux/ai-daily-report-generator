@@ -5,6 +5,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { SignalingService } from './services/webrtc/signaling'
 import signalingRoutes from './routes/signaling'
+import audioRoutes from './routes/audio'
 
 dotenv.config()
 
@@ -28,6 +29,9 @@ app.get('/api', (req, res) => {
 
 // 信令路由
 app.use(signalingRoutes)
+
+// 音频处理路由
+app.use(audioRoutes)
 
 const httpServer = createServer(app)
 const io = new SocketIOServer(httpServer, {
