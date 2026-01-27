@@ -1,0 +1,40 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String        @id @default(uuid())
+  email     String        @unique
+  name      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  reports   DailyReport[]
+}
+
+model DailyReport {
+  id           String   @id @default(uuid())
+  date         String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      String
+  todayWork    Json     // 存储分类后的工作内容
+  tomorrowPlan String[] // 存储优先级排序的计划
+  summary      String
+  conversation Json?    // 可选：存储完整对话记录
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date, project])
+  @@index([userId, date])
+}
