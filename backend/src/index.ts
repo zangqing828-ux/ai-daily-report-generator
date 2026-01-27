@@ -24,9 +24,10 @@ function validateEnv() {
     throw new Error('Please set a secure password in DATABASE_URL. Do not use the default value.')
   }
 
-  // 检查数据库连接
-  if (dbUrl && !dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
-    throw new Error('DATABASE_URL must start with postgresql:// or postgres://')
+  // 检查数据库连接格式（支持 prisma+postgres://, postgresql://, postgres://）
+  const validPrefixes = ['prisma+postgres://', 'postgresql://', 'postgres://']
+  if (dbUrl && !validPrefixes.some(prefix => dbUrl.startsWith(prefix))) {
+    throw new Error('DATABASE_URL must start with prisma+postgres://, postgresql:// or postgres://')
   }
 }
 
