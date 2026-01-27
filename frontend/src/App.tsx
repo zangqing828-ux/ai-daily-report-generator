@@ -1,7 +1,12 @@
 import CallScreen from './components/CallScreen'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function App() {
-  return <CallScreen />
+  return (
+    <ErrorBoundary>
+      <CallScreen />
+    </ErrorBoundary>
+  )
 }
 
 export default App
