@@ -1,17 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { io, Socket } from 'socket.io-client'
 import { createWebRTCConnection, closeWebRTCConnection } from '../lib/webrtc-adapter'
 import { startCall as apiStartCall, endCall as apiEndCall } from '../services/api'
-import type { CallStatus, WebRTCConnection } from '../types/conversation'
+import { useCallStore } from '../store/useCallStore'
+import type { WebRTCConnection } from '../types/conversation'
 
 export function useWebRTC() {
-  const [status, setStatus] = useState<CallStatus>({
-    aiState: 'idle',
-    duration: '0:00',
-    lastTranscript: '',
-    currentProject: '项目 A'
-  })
-  const [audioLevel, setAudioLevel] = useState(0)
+  const { status, setStatus, setAudioLevel } = useCallStore()
   const connectionRef = useRef<WebRTCConnection | null>(null)
   const socketRef = useRef<Socket | null>(null)
   const sessionIdRef = useRef<string | null>(null)
@@ -185,32 +180,8 @@ export function useWebRTC() {
     setAudioLevel(0)
   }, [])
 
-  const updateTranscript = useCallback((transcript: string) => {
-    setStatus(prev => ({
-      ...prev,
-      lastTranscript: transcript
-    }))
-  }, [])
-
-  const updateAIState = useCallback((aiState: CallStatus['aiState']) => {
-    setStatus(prev => ({
-      ...prev,
-      aiState
-    }))
-  }, [])
-
-  const updateAudioLevel = useCallback((level: number) => {
-    setAudioLevel(level)
-  }, [])
-
   return {
-    status,
     startCall,
-    endCall,
-    audioLevel,
-    updateTranscript,
-    updateAIState,
-    updateAudioLevel,
-    currentProject: status.currentProject
+    endCall
   }
 }

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useCallStore } from '../store/useCallStore'
 import { useWebRTC } from '../hooks/useWebRTC'
 
 export default function CallScreen() {
-  const { status, startCall, endCall, audioLevel, currentProject } = useWebRTC()
-  const [isPaused, setIsPaused] = useState(false)
-  const [isCallStarted, setIsCallStarted] = useState(false)
+  const { status, audioLevel, isPaused, isCallStarted, setIsPaused, setIsCallStarted } = useCallStore()
+  const { startCall, endCall } = useWebRTC()
+  const currentProject = status.currentProject
 
   const handleStartCall = async () => {
     await startCall()

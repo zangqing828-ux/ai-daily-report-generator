@@ -4,6 +4,15 @@ export interface ConversationMessage {
 }
 
 export class MockLLMService {
+  private responseCount = 0
+
+  // 确定性的默认响应
+  private static readonly DEFAULT_RESPONSES = [
+    '请继续',
+    '明白了，还有其他工作内容吗？',
+    '好的，请继续',
+    '了解'
+  ] as const
   async *chat(history: ConversationMessage[]): AsyncIterable<string> {
     const response = this.generateMockResponse(history)
     const words = response.split('')
@@ -38,14 +47,10 @@ export class MockLLMService {
       return `好的，我已经整理好了您的日报。感谢您的汇报！`
     }
 
-    // 默认响应
-    const defaultResponses = [
-      '请继续',
-      '明白了，还有其他工作内容吗？',
-      '好的，请继续',
-      '了解'
-    ]
-    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)]
+    // 默认响应（确定性，按顺序返回）
+    const response = MockLLMService.DEFAULT_RESPONSES[this.responseCount % MockLLMService.DEFAULT_RESPONSES.length]
+    this.responseCount++
+    return response
   }
 
   private delay(ms: number): Promise<void> {

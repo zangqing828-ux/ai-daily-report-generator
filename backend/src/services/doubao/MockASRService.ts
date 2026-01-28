@@ -1,6 +1,16 @@
 export class MockASRService {
   private transcripts: string[] = []
   private isProcessing = false
+  private callCount = 0
+
+  // 确定性的模拟文本序列
+  private static readonly MOCK_TEXTS = [
+    '今天完成了用户认证模块的开发',
+    '修复了登录接口的一个 bug',
+    '和产品经理讨论了新功能需求',
+    '优化了数据库查询性能',
+    '编写了单元测试用例'
+  ] as const
 
   async *processAudioStream(audioStream: AsyncIterable<ArrayBuffer>): AsyncIterable<string> {
     if (this.isProcessing) {
@@ -15,30 +25,21 @@ export class MockASRService {
         // 模拟识别延迟
         await this.delay(100)
 
-        // 模拟识别结果
+        // 模拟识别结果（确定性，按顺序返回）
         const mockText = this.getMockRecognition()
         yield mockText
         this.transcripts.push(mockText)
       }
     } finally {
       this.isProcessing = false
+      this.callCount = 0 // 重置计数器
     }
   }
 
   private getMockRecognition(): string {
-    const mockTexts = [
-      '今天完成了用户认证模块的开发',
-      '修复了登录接口的一个 bug',
-      '和产品经理讨论了新功能需求',
-      '优化了数据库查询性能',
-      '编写了单元测试用例',
-      '参与了代码评审会议',
-      '研究了新的前端框架',
-      '更新了项目文档',
-      '部署了测试环境',
-      '排查了一个内存泄漏问题'
-    ]
-    return mockTexts[Math.floor(Math.random() * mockTexts.length)]
+    const text = MockASRService.MOCK_TEXTS[this.callCount % MockASRService.MOCK_TEXTS.length]
+    this.callCount++
+    return text
   }
 
   private delay(ms: number): Promise<void> {
