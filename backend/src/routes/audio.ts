@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express'
+import { logger } from '../utils/logger'
 
 const router = Router()
 
@@ -36,7 +37,7 @@ router.post('/api/audio/stream', async (req: Request, res: Response) => {
 
       try {
         const audioBuffer = Buffer.concat(chunks)
-        console.log(`Received audio chunk: ${audioBuffer.length} bytes`)
+        logger.debug(`Received audio chunk: ${audioBuffer.length} bytes`, { size: audioBuffer.length })
 
         // TODO: 处理音频数据
         // 1. 转换为 Float32Array
@@ -49,7 +50,7 @@ router.post('/api/audio/stream', async (req: Request, res: Response) => {
           transcript: 'mock transcript'
         })
       } catch (error) {
-        console.error('Error processing audio:', error)
+        logger.error('Error processing audio', error)
         res.status(500).json({
           success: false,
           error: 'Failed to process audio'
@@ -78,7 +79,7 @@ router.post('/api/audio/stream', async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Error in audio stream handler:', error)
+    logger.error('Error in audio stream handler', error)
     res.status(500).json({
       success: false,
       error: 'Audio stream processing failed'

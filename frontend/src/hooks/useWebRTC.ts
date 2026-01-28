@@ -50,12 +50,18 @@ export function useWebRTC() {
       const session = await apiStartCall(status.currentProject)
       sessionIdRef.current = session.sessionId
 
-      // 2. 连接 Socket.IO
+      // 2. 连接 Socket.IO（配置重连策略）
       const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001', {
         transports: ['websocket', 'polling'],
         auth: {
           sessionId: session.sessionId
-        }
+        },
+        // 重连配置
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000, // 初始重连延迟 1 秒
+        reconnectionDelayMax: 10000, // 最大重连延迟 10 秒
+        timeout: 20000 // 连接超时 20 秒
       })
       socketRef.current = socket
 
@@ -65,6 +71,43 @@ export function useWebRTC() {
           ...prev,
           aiState: 'listening',
           lastTranscript: '已连接，请开始说话'
+        }))
+      })
+
+      socket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason)
+        setStatus(prev => ({
+          ...prev,
+          aiState: 'idle',
+          lastTranscript: reason === 'io server disconnect'
+            ? '服务器断开连接'
+            : '连接已断开，正在重连...'
+        }))
+      })
+
+      socket.io.on('reconnect', (attemptNumber) => {
+        console.log('Socket reconnected after', attemptNumber, 'attempts')
+        setStatus(prev => ({
+          ...prev,
+          aiState: 'listening',
+          lastTranscript: `重连成功 (第 ${attemptNumber} 次尝试)`
+        }))
+      })
+
+      socket.io.on('reconnect_attempt', (attemptNumber) => {
+        console.log('Reconnection attempt:', attemptNumber)
+        setStatus(prev => ({
+          ...prev,
+          lastTranscript: `正在重连... (${attemptNumber}/10)`
+        }))
+      })
+
+      socket.io.on('reconnect_failed', () => {
+        console.log('Reconnection failed')
+        setStatus(prev => ({
+          ...prev,
+          aiState: 'idle',
+          lastTranscript: '重连失败，请检查网络'
         }))
       })
 

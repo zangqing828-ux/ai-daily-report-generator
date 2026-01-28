@@ -34,7 +34,41 @@ export const endCallSchema = z.object({
   sessionId: sessionIdSchema
 })
 
+// API 响应验证 schemas
+export const successResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.any().optional(),
+  message: z.string().optional()
+})
+
+export const errorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  message: z.string().optional()
+})
+
+export const startCallResponseSchema = z.object({
+  success: z.literal(true),
+  sessionId: sessionIdSchema,
+  message: z.string(),
+  serverTime: z.string()
+})
+
+export const endCallResponseSchema = z.object({
+  success: z.literal(true),
+  message: z.string()
+})
+
+export const callStatusResponseSchema = z.object({
+  success: z.literal(true),
+  sessionId: sessionIdSchema,
+  status: z.enum(['active', 'ended', 'error']),
+  duration: z.number().int().min(0)
+})
+
 // 导出类型
 export type UserMessage = z.infer<typeof userMessageSchema>
 export type ProjectName = z.infer<typeof projectNameSchema>
 export type SessionId = z.infer<typeof sessionIdSchema>
+export type SuccessResponse = z.infer<typeof successResponseSchema>
+export type ErrorResponse = z.infer<typeof errorResponseSchema>

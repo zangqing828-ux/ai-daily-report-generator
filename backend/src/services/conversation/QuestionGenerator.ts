@@ -1,5 +1,6 @@
 import type { ConversationMessage } from '../../services/doubao/MockLLMService'
 import { userMessageSchema, projectNameSchema } from '../../utils/validation'
+import { logger } from '../../utils/logger'
 
 type ConversationStage = 'greeting' | 'today' | 'tomorrow' | 'summary' | 'complete'
 
@@ -62,7 +63,7 @@ export class QuestionGenerator {
     // 验证输入
     const validation = userMessageSchema.safeParse({ role: 'user', content: userMessage })
     if (!validation.success) {
-      console.error('Invalid user message:', validation.error)
+      logger.error('Invalid user message', validation.error, { message: userMessage })
       return false
     }
 

@@ -6,6 +6,8 @@ import dotenv from 'dotenv'
 import { SignalingService } from './services/webrtc/signaling'
 import signalingRoutes from './routes/signaling'
 import audioRoutes from './routes/audio'
+import { apiLimiter, audioUploadLimiter } from './middleware/rateLimit'
+import { logger } from './utils/logger'
 
 dotenv.config()
 
@@ -34,10 +36,7 @@ function validateEnv() {
 try {
   validateEnv()
 } catch (error) {
-  console.error('Environment validation failed:')
-  if (error instanceof Error) {
-    console.error(error.message)
-  }
+  logger.error('Environment validation failed', error)
   process.exit(1)
 }
 
@@ -45,7 +44,10 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// 健康检查端点
+// 应用速率限制
+app.use('/api/', apiLimiter)
+
+// 健康检查端点（不限制速率）
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
@@ -59,11 +61,11 @@ app.get('/api', (req, res) => {
   })
 })
 
-// 信令路由
+// 信令路由（应用速率限制）
 app.use(signalingRoutes)
 
-// 音频处理路由
-app.use(audioRoutes)
+// 音频处理路由（应用更严格的速率限制）
+app.use('/api/audio', audioUploadLimiter, audioRoutes)
 
 const httpServer = createServer(app)
 const io = new SocketIOServer(httpServer, {
@@ -77,13 +79,13 @@ const io = new SocketIOServer(httpServer, {
 const signaling = new SignalingService(io)
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id)
+  logger.info('Client connected', { socketId: socket.id })
   signaling.handleConnection(socket)
 })
 
 const PORT = process.env['PORT'] || 3001
 httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-  console.log(`Health check: http://localhost:${PORT}/health`)
-  console.log(`Environment: ${process.env['NODE_ENV'] || 'development'}`)
+  logger.info(`Server running on port ${PORT}`)
+  logger.info(`Health check: http://localhost:${PORT}/health`)
+  logger.info(`Environment: ${process.env['NODE_ENV'] || 'development'}`)
 })
