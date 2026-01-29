@@ -25,6 +25,8 @@ model User {
   // 关联
   projects   Project[]
   reports    DailyReport[]
+  profile    UserProfile?
+  conversationSummaries ConversationSummary[]
 }
 
 // 项目模型
@@ -39,6 +41,8 @@ model Project {
 
   // 关联
   reports     DailyReport[]
+  context     ProjectContext?
+  conversationSummaries ConversationSummary[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -67,4 +71,94 @@ model DailyReport {
   @@unique([userId, projectId, date])
   @@index([userId, date])
   @@index([projectId, date])
+}
+
+// ============================================
+// Phase 2: 长期记忆系统 - 新增模型
+// ============================================
+
+// 用户档案 - 存储用户偏好、工作习惯
+model UserProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 工作习惯偏好
+  preferences Json   // 存储 ReportingStyle, PreferredTime, InteractionStyle, ContentPreferences
+  
+  // 学习数据
+  learningData Json? // 存储 CommonPhrases, WorkPatterns, CommunicationStyle
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+// 项目上下文 - 存储项目历史、关键成果、进行中的任务
+model ProjectContext {
+  id        String   @id @default(uuid())
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // 项目元信息
+  metadata Json      // description, techStack, teamSize, startDate, targetDate
+  
+  // 关键成果（累积）
+  keyAccomplishments Json[] // 数组形式存储，便于追加
+  
+  // 进行中的任务（动态更新）
+  ongoingTasks Json[]
+  
+  // 已知阻碍（累积）
+  blockers Json[]
+  
+  // 相关干系人
+  stakeholders Json[]
+  
+  // 项目健康度（AI 评估）
+  healthMetrics Json?
+  
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  
+  @@index([projectId])
+  @@index([lastUpdatedAt])
+}
+
+// 对话历史摘要 - 存储每次对话的摘要和洞察
+model ConversationSummary {
+  id        String   @id @default(uuid())
+  
+  // 关联
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // 基本信息
+  sessionId String   @unique
+  date      DateTime
+  duration  Int      // 通话时长（秒）
+  
+  // AI 生成的摘要
+  summary   Json     // overview, keyTopics, accomplishments, blockers, nextSteps, insights
+  
+  // 行动项（可追踪）
+  actionItems Json[]
+  
+  // 用户反馈
+  userFeedback Json?
+  
+  // 原始对话（保留7天，可选）
+  rawTranscript Json?
+  transcriptExpiresAt DateTime?
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, projectId, sessionId])
+  @@index([userId, date])
+  @@index([projectId, date])
+  @@index([sessionId])
+  @@index([transcriptExpiresAt])
 }
