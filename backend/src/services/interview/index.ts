@@ -11,19 +11,11 @@ export * from './types';
 // 导出 InterviewStateMachine
 export { InterviewStateMachine } from './InterviewStateMachine';
 
-/**
- * 响应分析器类
- * 
- * 分析用户输入的质量，包括：
- * - 完整性评估
- * - 清晰度评估
- * - 相关性评估
- * 
- * TODO: 在后续任务中实现
- */
-export class ResponseAnalyzer {
-  // 占位符 - 后续任务实现
-}
+// 导出响应分析器
+export { ResponseAnalyzer } from './ResponseAnalyzer';
+
+// 导出分析结果类型
+export type { AnalysisResult, FollowUpSuggestion } from './ResponseAnalyzer';
 
 /**
  * 问题生成器类

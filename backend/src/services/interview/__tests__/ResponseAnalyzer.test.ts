@@ -53,7 +53,7 @@ describe('ResponseAnalyzer', () => {
       
       const result = analyzer.analyze(input, baseContext);
       
-      expect(result.analysis.quality).toBeOneOf([ResponseQuality.EXCELLENT, ResponseQuality.GOOD]);
+      expect([ResponseQuality.EXCELLENT, ResponseQuality.GOOD]).toContain(result.analysis.quality);
       expect(result.analysis.completeness).toBeGreaterThan(0.6);
       expect(result.analysis.clarity).toBeGreaterThan(0.5);
       expect(result.analysis.overall).toBeGreaterThan(0.5);
@@ -65,7 +65,7 @@ describe('ResponseAnalyzer', () => {
       
       const result = analyzer.analyze(input, baseContext);
       
-      expect(result.analysis.quality).toBeOneOf([ResponseQuality.INSUFFICIENT, ResponseQuality.POOR, ResponseQuality.ADEQUATE]);
+      expect([ResponseQuality.INSUFFICIENT, ResponseQuality.POOR, ResponseQuality.ADEQUATE]).toContain(result.analysis.quality);
       expect(result.analysis.completeness).toBeLessThan(0.5);
       expect(result.canProceed).toBe(false);
       expect(result.suggestions.length).toBeGreaterThan(0);
@@ -77,8 +77,8 @@ describe('ResponseAnalyzer', () => {
       const result = analyzer.analyze(input, baseContext);
       
       expect(result.analysis.clarity).toBeLessThan(0.6);
-      expect(result.analysis.quality).toBeOneOf([ResponseQuality.ADEQUATE, ResponseQuality.INSUFFICIENT]);
-      expect(result.suggestions.some(s => s.type === 'clarification')).toBe(true);
+      expect([ResponseQuality.ADEQUATE, ResponseQuality.INSUFFICIENT]).toContain(result.analysis.quality);
+      expect(result.suggestions.some((s: {type: string}) => s.type === 'clarification')).toBe(true);
     });
 
     it('应该提取相关数据', () => {

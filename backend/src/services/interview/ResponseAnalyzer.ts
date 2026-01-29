@@ -11,8 +11,6 @@ import {
   InterviewContext,
   ResponseAnalysis,
   CollectedData,
-  AnalysisResult,
-  FollowUpSuggestion,
 } from './types';
 
 /**
@@ -393,101 +391,21 @@ export class ResponseAnalyzer {
     };
     
     const phase = context.currentPhase;
-    const lowerInput = input.toLowerCase();
     
     switch (phase) {
       case InterviewPhase.PROGRESS_REVIEW:
         // 提取工作进展
-        // 模式1: 完成了XXX
-        const completedPattern = /(?:完成|做完|搞定|实现了|开发了|修复了|优化了)\s*[""']?([^。，；,.;]+)/gi;
-        let match;
-        while ((match = completedPattern.exec(input)) !== null) {
-          if (match[1] && match[1].trim().length > 0) {
-            extractedData.progress?.push(match[1].trim());
-          }
-        }
-        
-        // 模式2: 做了XXX
-        const didPattern = /(?:做了|处理了|负责了|参与了|进行了)\s*[""']?([^。，；,.;]+)/gi;
-        while ((match = didPattern.exec(input)) !== null) {
-          if (match[1] && match[1].trim().length > 0 && !extractedData.progress?.includes(match[1].trim())) {
-            extractedData.progress?.push(match[1].trim());
-          }
-        }
-        
-        // 提取时间花费
-        // 模式: 花了X小时/分钟
-        const timePattern = /(?:花了|用了|耗时|预计|大约)\s*(\d+(?:\.\d+)?)\s*(小时|h|分钟|min|分|天|day)/gi;
-        while ((match = timePattern.exec(input)) !== null) {
-          const value = match[1];
-          const unit = match[2];
-          const task = extractedData.progress && extractedData.progress.length > 0 
-            ? extractedData.progress[extractedData.progress.length - 1].substring(0, 30)
-            : '未指定任务';
-          if (extractedData.timeSpent) {
-            extractedData.timeSpent[task] = `${value} ${unit}`;
-          }
-        }
+        this.extractProgress(input, extractedData);
         break;
         
       case InterviewPhase.BLOCKERS:
         // 提取阻碍信息
-        // 模式1: 遇到了XXX问题/困难
-        const blockerPattern1 = /(?:遇到|碰到|发现|存在|出现|有个|卡在了)\s*[""']?([^。，；,.;]+(?:问题|困难|阻碍|bug|error|issue|exception|失败|错误))/gi;
-        while ((match = blockerPattern1.exec(input)) !== null) {
-          if (match[1] && match[1].trim().length > 0) {
-            extractedData.blockers?.push(match[1].trim());
-          }
-        }
-        
-        // 模式2: XXX阻塞/阻碍了
-        const blockerPattern2 = /(?:[^。，；,.;]+)(?:阻塞|阻碍|blocking|blocking|pending|waiting|依赖|depend)/gi;
-        while ((match = blockerPattern2.exec(input)) !== null) {
-          const matchText = match[0].trim();
-          if (matchText.length > 0 && matchText.length < 100 && !extractedData.blockers?.includes(matchText)) {
-            extractedData.blockers?.push(matchText);
-          }
-        }
-        
-        // 模式3: 需要XXX的帮助/支持
-        const helpPattern = /(?:需要|require|need)\s*([^。，；,.;]{0,30})(?:帮助|支持|support|help|协助|assistance)/gi;
-        while ((match = helpPattern.exec(input)) !== null) {
-          const helpContext = match[1] ? match[1].trim() : '';
-          const blockerText = helpContext ? `需要${helpContext}支持` : '需要帮助';
-          if (!extractedData.blockers?.includes(blockerText)) {
-            extractedData.blockers?.push(blockerText);
-          }
-        }
+        this.extractBlockers(input, extractedData);
         break;
         
       case InterviewPhase.NEXT_STEPS:
         // 提取下一步计划
-        // 模式1: 计划做XXX / 打算做XXX
-        const planPattern1 = /(?:计划|打算|准备|要|将|会|明天|接下来|下一步)\s*[""']?([^。，；,.;]+(?:做|完成|开发|测试|修复|优化|处理|进行|start|begin|work|continue))/gi;
-        while ((match = planPattern1.exec(input)) !== null) {
-          if (match[1] && match[1].trim().length > 0) {
-            extractedData.nextSteps?.push(match[1].trim());
-          }
-        }
-        
-        // 模式2: 继续XXX / 接着做XXX
-        const continuePattern = /(?:继续|接着|follow up|follow-up|ongoing|resume)\s*[""']?([^。，；,.;]+)/gi;
-        while ((match = continuePattern.exec(input)) !== null) {
-          if (match[1] && match[1].trim().length > 0 && !extractedData.nextSteps?.includes(match[1].trim())) {
-            extractedData.nextSteps?.push(`继续${match[1].trim()}`);
-          }
-        }
-        
-        // 模式3: 优先级高的任务
-        const priorityKeywords = ['优先', '重要', '紧急', 'priority', 'important', 'urgent', 'critical'];
-        priorityKeywords.forEach(keyword => {
-          const priorityPattern = new RegExp(`(?:${keyword})[：:]?\\s*([^。，；,.]{3,50})`, 'gi');
-          while ((match = priorityPattern.exec(input)) !== null) {
-            if (match[1] && match[1].trim().length > 0 && !extractedData.nextSteps?.includes(match[1].trim())) {
-              extractedData.nextSteps?.push(`[优先级] ${match[1].trim()}`);
-            }
-          }
-        });
+        this.extractNextSteps(input, extractedData);
         break;
         
       default:
@@ -507,6 +425,117 @@ export class ResponseAnalyzer {
     }
     
     return extractedData;
+  }
+
+  /**
+   * 提取工作进展
+   * 
+   * @param input - 用户输入文本
+   * @param extractedData - 提取的数据对象
+   */
+  private extractProgress(input: string, extractedData: Partial<CollectedData>): void {
+    // 模式1: 完成了XXX
+    const completedPattern = /(?:完成|做完|搞定|实现了|开发了|修复了|优化了)\s*[""']?([^。，；,.;]+)/gi;
+    let match: RegExpExecArray | null = null;
+    while ((match = completedPattern.exec(input)) !== null) {
+      if (match[1] && match[1].trim().length > 0) {
+        extractedData.progress?.push(match[1].trim());
+      }
+    }
+    
+    // 模式2: 做了XXX
+    const didPattern = /(?:做了|处理了|负责了|参与了|进行了)\s*[""']?([^。，；,.;]+)/gi;
+    while ((match = didPattern.exec(input)) !== null) {
+      if (match[1] && match[1].trim().length > 0 && !extractedData.progress?.includes(match[1].trim())) {
+        extractedData.progress?.push(match[1].trim());
+      }
+    }
+    
+    // 提取时间花费
+    // 模式: 花了X小时/分钟
+    const timePattern = /(?:花了|用了|耗时|预计|大约)\s*(\d+(?:\.\d+)?)\s*(小时|h|分钟|min|分|天|day)/gi;
+    while ((match = timePattern.exec(input)) !== null) {
+      const value = match[1];
+      const unit = match[2];
+      const task = extractedData.progress && extractedData.progress.length > 0 
+        ? extractedData.progress[extractedData.progress.length - 1].substring(0, 30)
+        : '未指定任务';
+      if (extractedData.timeSpent) {
+        extractedData.timeSpent[task] = `${value} ${unit}`;
+      }
+    }
+  }
+
+  /**
+   * 提取阻碍信息
+   * 
+   * @param input - 用户输入文本
+   * @param extractedData - 提取的数据对象
+   */
+  private extractBlockers(input: string, extractedData: Partial<CollectedData>): void {
+    // 模式1: 遇到了XXX问题/困难
+    const blockerPattern1 = /(?:遇到|碰到|发现|存在|出现|有个|卡在了)\s*[""']?([^。，；,.;]+(?:问题|困难|阻碍|bug|error|issue|exception|失败|错误))/gi;
+    let match: RegExpExecArray | null = null;
+    while ((match = blockerPattern1.exec(input)) !== null) {
+      if (match[1] && match[1].trim().length > 0) {
+        extractedData.blockers?.push(match[1].trim());
+      }
+    }
+    
+    // 模式2: XXX阻塞/阻碍了
+    const blockerPattern2 = /(?:[^。，；,.;]+)(?:阻塞|阻碍|blocking|blocking|pending|waiting|依赖|depend)/gi;
+    while ((match = blockerPattern2.exec(input)) !== null) {
+      const matchText = match[0].trim();
+      if (matchText.length > 0 && matchText.length < 100 && !extractedData.blockers?.includes(matchText)) {
+        extractedData.blockers?.push(matchText);
+      }
+    }
+    
+    // 模式3: 需要XXX的帮助/支持
+    const helpPattern = /(?:需要|require|need)\s*([^。，；,.;]{0,30})(?:帮助|支持|support|help|协助|assistance)/gi;
+    while ((match = helpPattern.exec(input)) !== null) {
+      const helpContext = match[1] ? match[1].trim() : '';
+      const blockerText = helpContext ? `需要${helpContext}支持` : '需要帮助';
+      if (!extractedData.blockers?.includes(blockerText)) {
+        extractedData.blockers?.push(blockerText);
+      }
+    }
+  }
+
+  /**
+   * 提取下一步计划
+   * 
+   * @param input - 用户输入文本
+   * @param extractedData - 提取的数据对象
+   */
+  private extractNextSteps(input: string, extractedData: Partial<CollectedData>): void {
+    // 模式1: 计划做XXX / 打算做XXX
+    const planPattern1 = /(?:计划|打算|准备|要|将|会|明天|接下来|下一步)\s*[""']?([^。，；,.;]+(?:做|完成|开发|测试|修复|优化|处理|进行|start|begin|work|continue))/gi;
+    let match: RegExpExecArray | null = null;
+    while ((match = planPattern1.exec(input)) !== null) {
+      if (match[1] && match[1].trim().length > 0) {
+        extractedData.nextSteps?.push(match[1].trim());
+      }
+    }
+    
+    // 模式2: 继续XXX / 接着做XXX
+    const continuePattern = /(?:继续|接着|follow up|follow-up|ongoing|resume)\s*[""']?([^。，；,.;]+)/gi;
+    while ((match = continuePattern.exec(input)) !== null) {
+      if (match[1] && match[1].trim().length > 0 && !extractedData.nextSteps?.includes(match[1].trim())) {
+        extractedData.nextSteps?.push(`继续${match[1].trim()}`);
+      }
+    }
+    
+    // 模式3: 优先级高的任务
+    const priorityKeywords = ['优先', '重要', '紧急', 'priority', 'important', 'urgent', 'critical'];
+    priorityKeywords.forEach(keyword => {
+      const priorityPattern = new RegExp(`(?:${keyword})[：:]?\\s*([^。，；,.]{3,50})`, 'gi');
+      while ((match = priorityPattern.exec(input)) !== null) {
+        if (match[1] && match[1].trim().length > 0 && !extractedData.nextSteps?.includes(match[1].trim())) {
+          extractedData.nextSteps?.push(`[优先级] ${match[1].trim()}`);
+        }
+      }
+    });
   }
 
   /**
