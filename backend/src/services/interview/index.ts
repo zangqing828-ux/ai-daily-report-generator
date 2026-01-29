@@ -8,19 +8,8 @@
 // 导出所有类型定义
 export * from './types';
 
-/**
- * 访谈状态机类
- * 
- * 管理访谈流程的状态流转，包括：
- * - 阶段推进控制
- * - 状态持久化
- * - 转移条件判断
- * 
- * TODO: 在后续任务中实现
- */
-export class InterviewStateMachine {
-  // 占位符 - 后续任务实现
-}
+// 导出 InterviewStateMachine
+export { InterviewStateMachine } from './InterviewStateMachine';
 
 /**
  * 响应分析器类
@@ -44,8 +33,6 @@ export class ResponseAnalyzer {
  * - 追问问题生成
  * - 过渡问题生成
  * 
- * TODO: 在后续任务中实现
+ * 实现基于模板的动态问题生成
  */
-export class QuestionGenerator {
-  // 占位符 - 后续任务实现
-}
+export { QuestionGenerator, TemplateContext } from './QuestionGenerator';
