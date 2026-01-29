@@ -6,6 +6,8 @@ import dotenv from 'dotenv'
 import { SignalingService } from './services/webrtc/signaling'
 import signalingRoutes from './routes/signaling'
 import audioRoutes from './routes/audio'
+import projectsRoutes from './routes/projects'
+import reportsRoutes from './routes/reports'
 import { apiLimiter, audioUploadLimiter } from './middleware/rateLimit'
 import { logger } from './utils/logger'
 
@@ -66,6 +68,12 @@ app.use(signalingRoutes)
 
 // 音频处理路由（应用更严格的速率限制）
 app.use('/api/audio', audioUploadLimiter, audioRoutes)
+
+// 项目管理路由
+app.use('/api/projects', projectsRoutes)
+
+// 日报路由
+app.use('/api/reports', reportsRoutes)
 
 const httpServer = createServer(app)
 const io = new SocketIOServer(httpServer, {

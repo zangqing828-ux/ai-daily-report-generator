@@ -13,28 +13,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户模型
 model User {
-  id        String        @id @default(uuid())
-  email     String        @unique
+  id        String   @id @default(uuid())
+  email     String   @unique
+  passwordHash String? // 存储加密后的密码
   name      String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  reports   DailyReport[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联
+  projects   Project[]
+  reports    DailyReport[]
 }
 
+// 项目模型
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  reports     DailyReport[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// 日报模型
 model DailyReport {
   id           String   @id @default(uuid())
-  date         String
+  date         String   // 格式: YYYY-MM-DD
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project      String
-  todayWork    Json     // 存储分类后的工作内容
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // 日报内容
+  todayWork    Json     // 存储分类后的工作内容 {开发: [...], 会议: [...], ...}
   tomorrowPlan String[] // 存储优先级排序的计划
-  summary      String
+  summary      String   // AI生成的摘要
   conversation Json?    // 可选：存储完整对话记录
+
+  // 元数据
+  duration     String?  // 通话时长 "3:45"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  @@unique([userId, date, project])
+  @@unique([userId, projectId, date])
   @@index([userId, date])
+  @@index([projectId, date])
 }

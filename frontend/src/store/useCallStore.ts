@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { CallStatus } from '../types/conversation'
+import type { CallStatus, ConversationMessage } from '../types/conversation'
+
+export type { ConversationMessage }
 
 interface CallState {
   // 通话状态
@@ -8,6 +10,9 @@ interface CallState {
   audioLevel: number
   isPaused: boolean
   isCallStarted: boolean
+  generatedReport?: string // 生成的日报内容
+  conversationHistory: ConversationMessage[] // 对话历史
+  currentProjectId?: string // 当前项目ID
 
   // Actions
   setStatus: (status: CallStatus | ((prev: CallStatus) => CallStatus)) => void
@@ -16,6 +21,10 @@ interface CallState {
   setIsCallStarted: (started: boolean) => void
   updateTranscript: (transcript: string) => void
   updateAIState: (aiState: CallStatus['aiState']) => void
+  setCurrentProject: (project: string) => void
+  setCurrentProjectId: (projectId: string) => void
+  addConversationMessage: (message: ConversationMessage) => void
+  setGeneratedReport: (report: string) => void
   reset: () => void
 }
 
@@ -34,6 +43,8 @@ export const useCallStore = create<CallState>()(
       audioLevel: 0,
       isPaused: false,
       isCallStarted: false,
+      conversationHistory: [],
+      currentProjectId: undefined,
 
       // Actions
       setStatus: (status) =>
@@ -57,12 +68,29 @@ export const useCallStore = create<CallState>()(
           status: { ...state.status, aiState }
         })),
 
+      setCurrentProject: (project) =>
+        set((state) => ({
+          status: { ...state.status, currentProject: project }
+        })),
+
+      setCurrentProjectId: (projectId) => set({ currentProjectId: projectId }),
+
+      addConversationMessage: (message) =>
+        set((state) => ({
+          conversationHistory: [...state.conversationHistory, message]
+        })),
+
+      setGeneratedReport: (report) => set({ generatedReport: report }),
+
       reset: () =>
         set({
           status: initialStatus,
           audioLevel: 0,
           isPaused: false,
-          isCallStarted: false
+          isCallStarted: false,
+          generatedReport: undefined,
+          conversationHistory: [],
+          currentProjectId: undefined
         })
     }),
     {

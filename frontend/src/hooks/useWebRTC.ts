@@ -4,14 +4,20 @@ import { createWebRTCConnection, closeWebRTCConnection } from '../lib/webrtc-ada
 import { startCall as apiStartCall, endCall as apiEndCall } from '../services/api'
 import { useCallStore } from '../store/useCallStore'
 import type { WebRTCConnection } from '../types/conversation'
+import type { ConversationMessage } from '../types/conversation'
 
 export function useWebRTC() {
-  const { status, setStatus, setAudioLevel } = useCallStore()
+  const { status, setStatus, setAudioLevel, addConversationMessage } = useCallStore()
   const connectionRef = useRef<WebRTCConnection | null>(null)
   const socketRef = useRef<Socket | null>(null)
   const sessionIdRef = useRef<string | null>(null)
   const startTimeRef = useRef<Date | null>(null)
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const isRecordingRef = useRef<boolean>(false)
 
   // 更新通话时长
   useEffect(() => {
@@ -37,6 +43,122 @@ export function useWebRTC() {
       }
     }
   }, [status.aiState])
+
+  // 设置音频分析器
+  const setupAudioAnalyzer = useCallback((stream: MediaStream) => {
+    try {
+      // 创建 AudioContext
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      audioContextRef.current = audioContext
+
+      // 创建分析器
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      analyserRef.current = analyser
+
+      // 连接音频源
+      const source = audioContext.createMediaStreamSource(stream)
+      source.connect(analyser)
+
+      // 创建数据数组并开始分析
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+      const analyzeAudio = () => {
+        if (!analyserRef.current) {
+          return
+        }
+
+        analyserRef.current.getByteFrequencyData(dataArray)
+
+        // 计算平均音量
+        const sum = dataArray.reduce((acc, val) => acc + val, 0)
+        const average = sum / dataArray.length
+
+        // 归一化到 0-1 范围
+        const normalizedLevel = average / 255
+
+        // 更新音频级别（设置阈值避免噪音）
+        if (normalizedLevel > 0.01) {
+          setAudioLevel(normalizedLevel)
+        } else {
+          setAudioLevel(0)
+        }
+
+        // 继续分析
+        animationFrameRef.current = requestAnimationFrame(analyzeAudio)
+      }
+
+      // 开始分析
+      analyzeAudio()
+    } catch (error) {
+      console.error('Failed to setup audio analyzer:', error)
+    }
+  }, [setAudioLevel])
+
+  // 清理音频分析器
+  const cleanupAudioAnalyzer = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+
+    analyserRef.current = null
+    setAudioLevel(0)
+  }, [setAudioLevel])
+
+  // 设置 MediaRecorder 采集音频数据
+  const setupMediaRecorder = useCallback((stream: MediaStream, socket: Socket) => {
+    try {
+      // 检查浏览器支持的 MIME 类型
+      let mimeType = 'audio/webm'
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus'
+      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+        mimeType = 'audio/ogg;codecs=opus'
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 16000
+      })
+
+      mediaRecorderRef.current = mediaRecorder
+      isRecordingRef.current = true
+
+      // 当有音频数据可用时
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0 && socket && socket.connected && isRecordingRef.current) {
+          try {
+            // 将 Blob 转换为 ArrayBuffer
+            const arrayBuffer = await event.data.arrayBuffer()
+            // 在浏览器中使用 Uint8Array，不要用 Buffer
+            const uint8Array = new Uint8Array(arrayBuffer)
+
+            // 发送音频数据到后端
+            socket.emit('audio-stream', uint8Array)
+            console.log('Sent audio data:', uint8Array.length, 'bytes')
+          } catch (error) {
+            console.error('Failed to send audio data:', error)
+          }
+        }
+      }
+
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event)
+      }
+
+      // 每 20ms 采集一次音频数据
+      mediaRecorder.start(20)
+      console.log('MediaRecorder started with mimeType:', mimeType)
+    } catch (error) {
+      console.error('Failed to setup MediaRecorder:', error)
+    }
+  }, [])
 
   const startCall = useCallback(async () => {
     try {
@@ -67,6 +189,10 @@ export function useWebRTC() {
 
       socket.on('connect', () => {
         console.log('Socket connected:', socket.id)
+
+        // 发送 start-call 事件启动豆包
+        socket.emit('start-call', {})
+
         setStatus(prev => ({
           ...prev,
           aiState: 'listening',
@@ -111,6 +237,19 @@ export function useWebRTC() {
         }))
       })
 
+      socket.on('call-started', (data) => {
+        console.log('Call started:', data)
+        setStatus(prev => ({
+          ...prev,
+          aiState: 'listening',
+          lastTranscript: '豆包已就绪，请开始说话'
+        }))
+      })
+
+      socket.on('session-ready', (data) => {
+        console.log('Session ready:', data)
+      })
+
       socket.on('answer', (data) => {
         console.log('Received answer:', data)
         // 处理 WebRTC answer
@@ -123,27 +262,68 @@ export function useWebRTC() {
 
       socket.on('transcript', (data) => {
         // 接收实时识别文本
-        if (data.text) {
+        console.log('Transcript:', data)
+        if (data.text && !data.isInterim) {
+          // 只保存非临时结果的文本
+          const isUser = data.role === 'user'
           setStatus(prev => ({
             ...prev,
+            aiState: isUser ? 'listening' : 'speaking',
             lastTranscript: data.text
           }))
+
+          // 保存到对话历史
+          const message: ConversationMessage = {
+            role: data.role === 'user' ? 'user' : 'assistant',
+            content: data.text,
+            timestamp: new Date().toISOString()
+          }
+          addConversationMessage(message)
         }
       })
 
-      socket.on('ai-response', (data) => {
-        // 接收 AI 响应
+      socket.on('chat-response', (data) => {
+        // 接收豆包对话响应
+        console.log('Chat response:', data)
         if (data.text) {
           setStatus(prev => ({
             ...prev,
             aiState: 'speaking',
             lastTranscript: data.text
           }))
+
+          // 保存到对话历史（避免重复，transcript 已经保存了）
+          // 这里不保存，因为 chat-response 和 transcript 都会返回同样的内容
         }
       })
 
-      socket.on('disconnect', () => {
-        console.log('Socket disconnected')
+      socket.on('ai-audio', async (audioData) => {
+        // 接收豆包 TTS 音频并播放
+        console.log('Received AI audio:', audioData?.length || 0, 'bytes')
+        try {
+          // 将 ArrayBuffer 转换为 AudioBuffer 并播放
+          const audioContext = audioContextRef.current
+          if (!audioContext) {
+            console.warn('AudioContext not available')
+            return
+          }
+
+          // audioData 是 Buffer，需要转换为 ArrayBuffer
+          const arrayBuffer = audioData.buffer.slice(
+            audioData.byteOffset,
+            audioData.byteOffset + audioData.byteLength
+          )
+
+          // 解码音频数据（豆包返回的是 Opus 格式，需要特殊处理）
+          // 暂时跳过播放，需要先实现 Opus 解码
+          console.log('Audio playback not yet implemented for Opus format')
+        } catch (error) {
+          console.error('Failed to play AI audio:', error)
+        }
+      })
+
+      socket.on('call-finished', () => {
+        console.log('Call finished')
       })
 
       socket.on('error', (error) => {
@@ -170,6 +350,12 @@ export function useWebRTC() {
         }
       })
 
+      // 6. 设置音频分析器（用于可视化）
+      setupAudioAnalyzer(connection.stream)
+
+      // 7. 设置 MediaRecorder 采集音频数据并发送到后端
+      setupMediaRecorder(connection.stream, socket)
+
       return connection
     } catch (error) {
       console.error('Failed to start call:', error)
@@ -180,9 +366,24 @@ export function useWebRTC() {
       }))
       throw error
     }
-  }, [status.currentProject])
+  }, [status.currentProject, setupAudioAnalyzer, setupMediaRecorder, setStatus, addConversationMessage])
 
   const endCall = useCallback(async () => {
+    // 停止音频录制
+    isRecordingRef.current = false
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+      mediaRecorderRef.current = null
+    }
+
+    // 发送 finish-call 事件通知后端关闭豆包连接
+    if (socketRef.current) {
+      socketRef.current.emit('finish-call', {})
+    }
+
+    // 清理音频分析器
+    cleanupAudioAnalyzer()
+
     // 清理 Socket.IO 连接
     if (socketRef.current) {
       socketRef.current.disconnect()
@@ -221,7 +422,7 @@ export function useWebRTC() {
     })
 
     setAudioLevel(0)
-  }, [])
+  }, [cleanupAudioAnalyzer, setStatus, setAudioLevel])
 
   return {
     startCall,
