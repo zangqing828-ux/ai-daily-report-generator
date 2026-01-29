@@ -150,12 +150,15 @@ export class InterviewStateMachine extends EventEmitter {
   private analyzeResponse(input: string, phase?: InterviewPhase): ResponseAnalysis {
     const length = input.length;
     const hasDetail = length > 30;
-    const hasSpecifics = /\d+/.test(input) || /(完成|实现|解决|修复|添加|更新|做了|写了|改了)/.test(input);
+    const hasSpecifics = /\d+/.test(input) || /(完成|实现|解决|修复|添加|更新|做了|写了|改了|问题|困难|阻碍|错误|异常|慢|卡|失败|超时|文档|接口|API|明天|今天|后天|下周|预计|计划|打算|准备|后续|接着|继续|做|搞|弄)/.test(input);
     
     // 问候阶段和总结确认阶段可以容忍较短的回复
+    // 阻碍和下一步阶段允许描述性回答
     const isShortAcceptable = phase === InterviewPhase.GREETING || 
                               phase === InterviewPhase.SUMMARY_CONFIRM ||
-                              phase === InterviewPhase.CLOSING;
+                              phase === InterviewPhase.CLOSING ||
+                              phase === InterviewPhase.BLOCKERS ||
+                              phase === InterviewPhase.NEXT_STEPS;
 
     let quality = ResponseQuality.GOOD;
     let completeness = 0.6;
